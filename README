@@ -1,0 +1,60 @@
+# CoSMPAD Predictor
+
+**CoSMPAD_tools: Comparative Secretory Microbial Preprotein Activity Database Tools**  
+A Python package for extracting features used to train the SP classifier in CoSMPAD and for predicting secretory protein types.
+
+---
+
+## Features
+
+- Predict secretory protein types: Sec/SPI, Sec/SPII, Sec/SPIII, Tat/SPI, Tat/SPII, and TM/Globular.
+- Ensemble-based predictions using pre-trained XGBoost models.
+- Easy-to-use Python API for single or batch sequence predictions.
+- Feature extraction capabilities for downstream analyses.
+
+---
+
+## Installation
+
+Install directly from source:
+
+```bash
+git clone https://github.com/yourusername/cosmpad_predictor.git
+cd cosmpad_predictor
+pip install .
+
+
+Usage
+from cosmpad_predictor.api import CosmpadPredictor
+
+# Initialize predictor
+predictor = CosmpadPredictor()
+
+# Predict from sequences
+sequences = ["MKKKKTIIALSYIFCLVFADYKDDDDK", "MPLNVSFTL..."]
+results = predictor.predict_from_sequence(sequences)
+
+for res in results:
+    print(res)
+
+
+Example output:
+
+{
+    'sequence': 'MKKKKTIIALSYIFCLVFADYKDDDDK',
+    'pred_label_name': 'Sec/SPI',
+    'pred_proba': {
+        'TM/Globular': 0.03,
+        'Sec/SPI': 0.96,
+        'Sec/SPII': 0.03,
+        'Sec/SPIII': 0.00,
+        'Tat/SPI': 0.00,
+        'Tat/SPII': 0.00
+    }
+}
+
+Citation
+
+If you use CoSMPAD_tools in your research, please cite:
+
+Rafael Moran-Torres, PhD work in progress. CoSMPAD: Comparative Secretory Microbial Preprotein Activity Database.
