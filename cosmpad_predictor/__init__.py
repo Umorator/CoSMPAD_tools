@@ -1,4 +1,4 @@
-from .api import extract_from_sequence, CosmpadPredictor
+from .api import CosmpadPredictor
 from ._version import __version__
 
-__all__ = ["extract_from_sequence", "CosmpadPredictor", "__version__"]
+__all__ = ["CosmpadPredictor", "__version__"]

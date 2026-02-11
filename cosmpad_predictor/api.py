@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from .esm_model import extract_esm_features
 from .features import extract_classical_features, clean_sequence
-from sklearn.preprocessing import LabelEncoder
+
 
 # ----------------------------
 # Ensemble paths
@@ -24,38 +24,11 @@ MODEL_PATHS = [
 FEATURE_ORDER_PATH = os.path.join(BASE_DIR, "trained_feature_order.pkl")
 ENCODERS_PATH = os.path.join(BASE_DIR, "label_encoders.pkl")
 
-# Load feature order
-FEATURE_ORDER = joblib.load(FEATURE_ORDER_PATH)
 
-# ----------------------------
-# Feature extraction
-# ----------------------------
-def extract_from_sequence(sequence: str, feature_order=None) -> dict:
-    if feature_order is None:
-        feature_order = FEATURE_ORDER
-
-    seq = clean_sequence(sequence)
-    if not seq:
-        return {}
-
-    features = {}
-    features.update(extract_esm_features(seq, "full"))
-    features.update(extract_classical_features(seq, "full"))
-
-    missing_features = [f for f in feature_order if f not in features]
-    if missing_features:
-        raise ValueError(f"Missing required features for COSMPAD prediction.")
-
-    ordered_features = {f: features[f] for f in feature_order}
-    return ordered_features
-
-# ----------------------------
-# Predictor
-# ----------------------------
 class CosmpadPredictor:
     def __init__(self):
         self.models = [joblib.load(p) for p in MODEL_PATHS]
-        self.feature_order = FEATURE_ORDER
+        self.feature_order = joblib.load(FEATURE_ORDER_PATH)
 
         if os.path.exists(ENCODERS_PATH):
             encoders = joblib.load(ENCODERS_PATH)
@@ -76,34 +49,79 @@ class CosmpadPredictor:
             'TATLIPO': 'Tat/SPII'
         }
 
+    # ----------------------------
+    # Feature extraction (moved inside class)
+    # ----------------------------
+    def extract_from_sequence(self, sequence: str) -> dict:
+        seq = clean_sequence(sequence)
+        if not seq:
+            return {}
+
+        features = {}
+        features.update(extract_esm_features(seq, "full"))
+        features.update(extract_classical_features(seq, "full"))
+
+        missing_features = [f for f in self.feature_order if f not in features]
+        if missing_features:
+            raise ValueError("Missing required features for COSMPAD prediction.")
+
+        return {f: features[f] for f in self.feature_order}
+
+    # ----------------------------
+    # Prediction
+    # ----------------------------
     def predict_from_sequence(self, sequences: list[str]) -> pd.DataFrame:
         results = []
 
         for seq in sequences:
-            # Extract features
-            features = extract_from_sequence(seq, feature_order=self.feature_order)
+            # ---- Feature extraction ----
+            features = self.extract_from_sequence(seq)
             X = pd.DataFrame([features], columns=self.feature_order)
 
-            # Ensemble probability
-            probas = np.array([model.predict_proba(X)[0] for model in self.models])
-            avg_proba = probas.mean(axis=0)
+            # ---- Collect model probabilities ----
+            model_probas = np.array([
+                model.predict_proba(X)[0]
+                for model in self.models
+            ])
 
-            # Get SP labels from LabelEncoder
-            sp_labels = self.label_encoder.classes_ if self.label_encoder else list(range(len(avg_proba)))
+            # ---- Soft voting (average probabilities) ----
+            avg_proba = model_probas.mean(axis=0)
 
-            # Map probabilities to scientific names with rounding to 3 decimal places
+            # ---- Class labels ----
+            sp_labels = (
+                self.label_encoder.classes_
+                if self.label_encoder
+                else list(range(len(avg_proba)))
+            )
+
+            # ---- Final prediction ----
+            pred_index = np.argmax(avg_proba)
+            pred_label_short = sp_labels[pred_index]
+            pred_label_name = self.sp_name_mapping.get(
+                pred_label_short,
+                pred_label_short
+            )
+
+            # ---- Ensemble confidence ----
+            mean_max_proba = np.mean(np.max(model_probas, axis=1))
+            vote_agreement = np.mean(
+                np.argmax(model_probas, axis=1) == pred_index
+            )
+
+            ensemble_confidence = (mean_max_proba + vote_agreement) / 2
+
+            # ---- Probability dictionary (rounded for display only) ----
             proba_dict = {
-                self.sp_name_mapping.get(lbl, lbl): float(f"{prob:.3f}")
+                self.sp_name_mapping.get(lbl, lbl): round(float(prob), 3)
                 for lbl, prob in zip(sp_labels, avg_proba)
             }
-
-            # Predicted SP type (highest probability)
-            pred_label_name = max(proba_dict, key=proba_dict.get)
 
             results.append({
                 "sequence": seq,
                 "pred_label_name": pred_label_name,
-                "pred_proba": proba_dict
+                "pred_proba": proba_dict,
+                "ensemble_confidence": round(float(ensemble_confidence), 3)
             })
 
         return pd.DataFrame(results)
+
