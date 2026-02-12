@@ -1,6 +1,6 @@
 [project]
 name = "cosmpad_predictor"
-version = "0.1.0"
+version = "0.1.1"
 description = "CoSMPAD: Comparative Secretory Microbial Preprotein Activity Database — part of ongoing PhD research, intended for submission and publication."
 authors = [
     { name="Rafael", email="morantor@hu-berlin.de" }
