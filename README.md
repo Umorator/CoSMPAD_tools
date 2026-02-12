@@ -55,72 +55,154 @@ CoSMPAD Tools is a comprehensive bioinformatics pipeline designed for the classi
 
 ### Option 1: Docker (Recommended) 🐳
 
+**📥 Pull the image**
 ```bash
-# Pull and run in one command
-docker run -it --rm \
-  umorator/cosmpad_tools:latest \
-  python
+docker pull umorator/cosmpad_tools:latest
+```
+🚀 Run interactive Python session
+
+```bash
+docker run -it --rm umorator/cosmpad_tools:latest python
 ```
 
-**For working with your local files:**
-```bash
-docker run -it --rm \
-  -v "$(pwd):/workspace" \
-  -w /workspace \
-  umorator/cosmpad_tools:latest \
-  python
-```
+📁 Work With Your Local Files (Running Your Own Script)
 
+If you want to run your own Python script (e.g., `run_test.py`) using the Docker image, you need to mount your local working folder into the container.
+
+```bash
+docker run -it --rm -v \Users\your_username\your_working_folder:/workspace -w /workspace umorator/cosmpad_tools:latest python run_test.py
+
+```
 ### Option 2: Local Installation (pip)
 
+**📋 Step-by-step setup:**
+
+1️⃣ **Clone the repository**
 ```bash
-# Create a fresh environment (recommended)
-conda create -n cosmpad python=3.11
-conda activate cosmpad
+git clone https://github.com/Umorator/CoSMPAD_tools.git
+cd CoSMPAD_tools
+```
+Make sure you are in the repo root where pyproject.toml is located.
 
-# Install the package
-pip install git+https://github.com/yourusername/cosmpad-tools.git
+2️⃣ Create a fresh conda environment with Python 3.11
+```
+bash
+conda create -n CoSMPAD_tools python=3.11 -y
+conda activate CoSMPAD_tools
+```
 
-# Or for development
-git clone https://github.com/yourusername/cosmpad-tools.git
-cd cosmpad-tools
+3️⃣ Install CPU-only PyTorch
+```
+bash
+conda install pytorch torchvision torchaudio cpuonly -c pytorch -y
+```
+
+4️⃣ Install CoSMPAD in editable mode
+```
+bash
 pip install -e .
 ```
 
-**Note:** Local installation will download the 2.5GB ESM-2 model on first use. The model is cached in `~/.cache/cosmpad/` and will not require re-downloading.
+This installs the package with all dependencies from pyproject.toml.
 
----
+5️⃣ Verify installation
+```
+bash
+python -c "from cosmpad_predictor import CosmpadPredictor; print('✅ CoSMPAD imported successfully')"
+```
 
 ## ⚡ Quick Start
 
-### Python API (Docker or Local)
+### Python API (run_test.py)
 
 ```python
 from cosmpad_predictor import CosmpadPredictor
 
-# Initialize predictor
-# - With Docker: instant (model pre-loaded)
-# - With pip: downloads model on first use (~2.5GB, cached forever)
+# Initialize predictor (loads model)
 predictor = CosmpadPredictor()
 
-# Single sequence prediction
-sequence = "MKKKKTIIALSYIFCLVFADYKDDDDK"
-result = predictor.predict_from_sequence(sequence)
-print(f"Prediction: {result['pred_label_name']}")
-print(f"Confidence: {result['confidence']:.3f}")
 
-# Batch prediction
+# ==============================
+# 1️⃣ Single Sequence Prediction
+# ==============================
+
+single_sequence = "MKPKKIISNKAQISLELALLLGALVVAASIVG"
+
+single_result = predictor.predict_from_sequence([single_sequence])
+
+print("========== Single Prediction ==========")
+
+for _, row in single_result.iterrows():
+    print("\nSequence:", row["sequence"])
+    print("Prediction:", row["pred_label_name"])
+
+    print("Probabilities:")
+    for label, prob in row["pred_proba"].items():
+        print(f"  {label}: {prob:.3f}")
+
+    print("Model Confidence:", f"{row['ensemble_confidence']:.3f}")
+
+print()
+
+
+# ==============================
+# 2️⃣ Batch Prediction
+# ==============================
+
 sequences = [
-    "MKKKKTIIALSYIFCLVFADYKDDDDK",
+    "MKPKKIISNKAQISLELALLLGALVVAASIVG",
     "MPLNVSFTLFIASVLMLVVAKPLGVAQ",
     "MNKIKYLLLSLVGFLVFADPAFAKRE"
 ]
-results = predictor.predict_from_sequence(sequences)
 
-for seq, res in zip(sequences, results):
-    print(f"\nSequence: {seq[:20]}...")
-    print(f"Prediction: {res['pred_label_name']}")
-    print(f"Confidence: {res['confidence']:.3f}")
+batch_results = predictor.predict_from_sequence(sequences)
+
+print("========== Batch Predictions ==========")
+
+for i, (_, row) in enumerate(batch_results.iterrows(), 1):
+    print(f"\n--- Sequence {i} ---")
+    print("Sequence:", row["sequence"])
+    print("Prediction:", row["pred_label_name"])
+
+    print("Probabilities:")
+    for label, prob in row["pred_proba"].items():
+        print(f"  {label}: {prob:.3f}")
+
+    print("Model Confidence:", f"{row['ensemble_confidence']:.3f}")
+
+print()
+
+
+# ==============================
+# 3️⃣ Single Sequence Feature Extraction
+# ==============================
+
+features_single = predictor.extract_from_sequence(single_sequence)
+
+print("========== Single Sequence Feature Extraction ==========")
+print("Number of features:", len(features_single))
+print("First 10 features:")
+
+for k, v in list(features_single.items())[:10]:
+    print(f"  {k}: {v}")
+
+print()
+
+
+# ==============================
+# 4️⃣ Batch Feature Extraction
+# ==============================
+
+features_batch = [predictor.extract_from_sequence(seq) for seq in sequences]
+
+print("========== Batch Feature Extraction ==========")
+print(f"Extracted features for {len(features_batch)} sequences")
+
+for i, features in enumerate(features_batch, 1):
+    print(f"\n--- Sequence {i} Feature Preview ---")
+    for k, v in list(features.items())[:5]:
+        print(f"  {k}: {v}")
+
 ```
 
 ## 🔧 Pipeline Stages
