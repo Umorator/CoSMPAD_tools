@@ -1,6 +1,7 @@
 import warnings
 import torch
 import esm
+#ESM-2 model for feature extraction
 
 _ESM_MODEL = None
 _ESM_ALPHABET = None
